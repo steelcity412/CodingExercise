@@ -12,7 +12,6 @@ namespace NUIX.InvestmentPerformance.API.Controllers
 
         public InvestmentsController(IInvestmentService investmentService)
         {
-            // TODO - Explain what the constructor is doing here.
             this.investmentService = investmentService;
         }
 
@@ -21,17 +20,32 @@ namespace NUIX.InvestmentPerformance.API.Controllers
         public ActionResult<List<InvestmentSummaryDTO>> GetInvestments(Guid userInvestmentID)
         {
             var investments = investmentService.GetInvestmentsForUser(userInvestmentID);
+
+            if (investments == null || investments.Count() == 0)
+                return NotFound("Unable to retrieve data for userInvestmentID:" + userInvestmentID + ". Please try again using a valid userInvestmentID.");
+
             return Ok(investments);
         }
 
-        [HttpGet("api/investments/get-investments-details")]
-        public ActionResult<InvestmentDetailDTO> GetInvestmentDetails(Guid userInvestmentID, Guid investmentId)
+        [HttpGet("api/investments/get-user-investments-details")]
+        public ActionResult<InvestmentDetailDTO> GetUserInvestmentDetails(Guid userInvestmentID, Guid investmentId)
         {
             var details = investmentService.GetInvestmentDetails(userInvestmentID, investmentId);
             if (details == null)
-                return NotFound();
+                return NotFound($"Unable to retrieve Investment Details for userInvestmentID:{userInvestmentID} and investmentID:{investmentId}. Please try again using a valid userInvestmentID and investmentID.");
 
             return Ok(details);
         }
+
+        /// <summary>
+        /// Adding this incase the dev team wants to see the middleware
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        //[HttpGet("throw")]
+        //public IActionResult ThrowException()
+        //{
+        //    throw new Exception("This is a test exception");
+        //}
     }
 }

@@ -1,82 +1,68 @@
-﻿using NUIX.InvestmentPerformance.API.DataTransferObjects;
+﻿using NUIX.InvestmentPerformance.API.Data;
+using NUIX.InvestmentPerformance.API.DataTransferObjects;
 using NUIX.InvestmentPerformance.API.Models;
 using NUIX.InvestmentPerformance.API.Models.Enums;
+using InvestmentDbContext = NUIX.InvestmentPerformance.API.Data.InvestmentDbContext;
 
 namespace NUIX.InvestmentPerformance.API.Services
 {
     public class InvestmentService : IInvestmentService
     {
-        // TODO : Ask them if the want me to setup a database instead of having to use mock data.
-        private readonly List<UserInvestment> _userInvestments = new()
+        private readonly InvestmentDbContext _context;
+
+        public InvestmentService()
         {
-            new UserInvestment
-            {
-                UserInvestmentID = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                UserInvestments = new List<Investment>
-                {
-                    new Investment
-                    {
-                        InvestmentID = Guid.Parse("b4a35a0a-1815-4439-b9f6-60f786e1a227"),
-                        InvestmentName = "Tesla",
-                        NumberOfShares = 10,
-                        PurchasePricePerShare = 150,
-                        CurrentPricePerShare = 180,
-                        PurchaseDate = DateTime.UtcNow.AddMonths(-14)
-                    },
-                    new Investment
-                    {
-                        InvestmentID = Guid.Parse("04c031fa-f23d-4a73-90a7-735c94db2452"),
-                        InvestmentName = "Apple",
-                        NumberOfShares = 20,
-                        PurchasePricePerShare = 120,
-                        CurrentPricePerShare = 110,
-                        PurchaseDate = DateTime.UtcNow.AddMonths(-10)
-                    }
-                }
-            }
-        };
 
-
-        public List<InvestmentSummaryDTO> GetInvestmentsForUser(Guid userInvestmentID)
-        {
-            var user = _userInvestments.FirstOrDefault(x => x.UserInvestmentID == userInvestmentID);
-
-            if (user == null) return new();
-
-            return user.UserInvestments.Select(i => new InvestmentSummaryDTO
-            {
-                InvestmentID = i.InvestmentID,
-                InvestmentName = i.InvestmentName
-            }).ToList();
         }
 
-        public InvestmentDetailDTO? GetInvestmentDetails(Guid userInvestmentID, Guid investmentID)
+        public InvestmentService(InvestmentDbContext context)
         {
-            var user = _userInvestments.FirstOrDefault(x => x.UserInvestmentID == userInvestmentID);
+            _context = context;
+        }
 
-            var investment = user?.UserInvestments.FirstOrDefault(i => i.InvestmentID == investmentID);
+        public List<InvestmentSummaryDTO> GetInvestmentsForUser(Guid userId)
+        {
+            return _context.Investments
+                .Where(i => i.UserID == userId)
+                .Select(i => new InvestmentSummaryDTO
+                {
+                    InvestmentID = i.InvestmentID,
+                    InvestmentName = i.InvestmentName
+                })
+                .ToList();
+        }
 
-            if (investment == null) return null;
+        public InvestmentDetailDTO? GetInvestmentDetails(Guid userId, Guid investmentId)
+        {
+            var investment = _context.Investments
+                .FirstOrDefault(i => i.InvestmentID == investmentId && i.UserID == userId);
 
-            decimal currentValue = investment.NumberOfShares * investment.CurrentPricePerShare;
-            
-            decimal totalCost = investment.NumberOfShares * investment.PurchasePricePerShare;
-            
-            decimal gainOrLoss = currentValue - totalCost;
+            if (investment == null)
+                return null;
 
-            var term = (DateTime.UtcNow - investment.PurchaseDate).TotalDays <= 365 ? InvestmentTerm.ShortTerm : InvestmentTerm.LongTerm;
+            return CalculateInvestmentDetails(investment);
+        }
+
+        public InvestmentDetailDTO CalculateInvestmentDetails(Investment investment)
+        {
+
+            var currentValue = investment.NumberOfShares * investment.CurrentPricePerShare;
+            var term = (DateTime.UtcNow - investment.PurchaseDate).TotalDays > 365 ? InvestmentTerm.LongTerm : InvestmentTerm.ShortTerm;
+            var totalCost = investment.NumberOfShares * investment.CostBasisPerShare;
+            var gainLoss = currentValue - totalCost;
 
             return new InvestmentDetailDTO
             {
                 InvestmentID = investment.InvestmentID,
                 InvestmentName = investment.InvestmentName,
                 NumberOfShares = investment.NumberOfShares,
-                CostBasisPerShare = investment.PurchasePricePerShare,
+                CostBasisPerShare = investment.CostBasisPerShare,
                 CurrentPrice = investment.CurrentPricePerShare,
                 CurrentValue = currentValue,
-                TotalGainOrLoss = gainOrLoss,
-                Term = term
+                Term = term,
+                TotalGainOrLoss = gainLoss
             };
         }
     }
+
 }
